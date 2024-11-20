@@ -15,7 +15,7 @@ var upgrader = websocket.Upgrader{
 }
 
 // クライアント情報
-type Client struct {
+type Member struct {
 	conn   *websocket.Conn
 	name   string
 	roomID string
@@ -25,7 +25,7 @@ type Client struct {
 // 部屋情報
 type Room struct {
 	ID      string
-	clients map[*Client]bool
+	members map[*Member]bool
 	mu      sync.Mutex
 	votes   map[string]string
 }
@@ -33,64 +33,64 @@ type Room struct {
 // ハブ（部屋全体を管理）
 type Hub struct {
 	rooms      map[string]*Room
-	register   chan *Client
-	unregister chan *Client
+	register   chan *Member
+	unregister chan *Member
 	mu         sync.Mutex
 }
 
 func newHub() *Hub {
 	return &Hub{
 		rooms:      make(map[string]*Room),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
+		register:   make(chan *Member),
+		unregister: make(chan *Member),
 	}
 }
 
 func (h *Hub) run() {
 	for {
 		select {
-		case client := <-h.register:
-			h.addClientToRoom(client)
-		case client := <-h.unregister:
-			h.removeClientFromRoom(client)
+		case member := <-h.register:
+			h.addmemberToRoom(member)
+		case member := <-h.unregister:
+			h.removememberFromRoom(member)
 		}
 	}
 }
 
-func (h *Hub) addClientToRoom(client *Client) {
+func (h *Hub) addmemberToRoom(member *Member) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	room, exists := h.rooms[client.roomID]
+	room, exists := h.rooms[member.roomID]
 	if !exists {
 		room = &Room{
-			ID:      client.roomID,
-			clients: make(map[*Client]bool),
+			ID:      member.roomID,
+			members: make(map[*Member]bool),
 			votes:   make(map[string]string),
 		}
-		h.rooms[client.roomID] = room
+		h.rooms[member.roomID] = room
 	}
 	room.mu.Lock()
-	room.clients[client] = true
+	room.members[member] = true
 	room.mu.Unlock()
 
 	h.broadcastRoomState(room)
 }
 
-func (h *Hub) removeClientFromRoom(client *Client) {
+func (h *Hub) removememberFromRoom(member *Member) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	room, exists := h.rooms[client.roomID]
+	room, exists := h.rooms[member.roomID]
 	if !exists {
 		return
 	}
 	room.mu.Lock()
-	delete(room.clients, client)
+	delete(room.members, member)
 	room.mu.Unlock()
 
-	if len(room.clients) == 0 {
-		delete(h.rooms, client.roomID)
+	if len(room.members) == 0 {
+		delete(h.rooms, member.roomID)
 	} else {
 		h.broadcastRoomState(room)
 	}
@@ -101,21 +101,21 @@ func (h *Hub) broadcastRoomState(room *Room) {
 	defer room.mu.Unlock()
 
 	state := map[string]interface{}{
-		"clients":   []string{},
-		"voteCount": room.votes,
+		"members": []string{},
+		"votes":   room.votes,
 	}
 
-	for client := range room.clients {
-		state["clients"] = append(state["clients"].([]string), client.name)
+	for member := range room.members {
+		state["members"] = append(state["members"].([]string), member.name)
 	}
 
 	message, _ := json.Marshal(state)
-	for client := range room.clients {
-		client.send <- message
+	for member := range room.members {
+		member.send <- message
 	}
 }
 
-func (c *Client) readPump(h *Hub) {
+func (c *Member) readPump(h *Hub) {
 	defer func() {
 		h.unregister <- c
 		c.conn.Close()
@@ -146,7 +146,7 @@ func (c *Client) readPump(h *Hub) {
 	}
 }
 
-func (c *Client) writePump() {
+func (c *Member) writePump() {
 	for message := range c.send {
 		err := c.conn.WriteMessage(websocket.TextMessage, message)
 		if err != nil {
@@ -170,11 +170,11 @@ func serveWs(h *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := &Client{conn: conn, name: name, roomID: roomID, send: make(chan []byte, 256)}
-	h.register <- client
+	member := &Member{conn: conn, name: name, roomID: roomID, send: make(chan []byte, 256)}
+	h.register <- member
 
-	go client.readPump(h)
-	go client.writePump()
+	go member.readPump(h)
+	go member.writePump()
 }
 
 func main() {
