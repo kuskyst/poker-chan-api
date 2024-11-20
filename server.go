@@ -9,12 +9,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// WebSocketアップグレーダー
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-// クライアント情報
 type Member struct {
 	conn   *websocket.Conn
 	name   string
@@ -22,7 +20,6 @@ type Member struct {
 	send   chan []byte
 }
 
-// 部屋情報
 type Room struct {
 	ID      string
 	members map[*Member]bool
@@ -30,7 +27,6 @@ type Room struct {
 	votes   map[string]string
 }
 
-// ハブ（部屋全体を管理）
 type Hub struct {
 	rooms      map[string]*Room
 	register   chan *Member
