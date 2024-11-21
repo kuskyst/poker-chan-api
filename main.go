@@ -25,9 +25,10 @@ type Member struct {
 
 type Room struct {
 	ID      string
-	members map[string]*Member // UUIDをキーにしてメンバーを管理
+	title   string
+	members map[string]*Member
 	mu      sync.Mutex
-	votes   map[string]string // UUIDをキーにして投票を管理
+	votes   map[string]string
 }
 
 type Hub struct {
@@ -111,6 +112,7 @@ func (h *Hub) broadcastRoomState(room *Room) {
 	votes := room.votes
 
 	state := map[string]interface{}{
+		"title":   room.title,
 		"members": members,
 		"votes":   votes,
 	}
@@ -144,6 +146,11 @@ func (c *Member) readPump(hub *Hub) {
 		if message.Name != "" {
 			c.name = message.Name
 			log.Printf("Client %s registered with name: %s\n", c.uuid, c.name)
+		}
+
+		if message.Title != "" {
+			hub.rooms[c.roomID].title = message.Title
+			log.Printf("Client %s registered with title: %s\n", c.uuid, message.Title)
 		}
 
 		if message.Vote != "" {
