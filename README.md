@@ -26,4 +26,14 @@ npx wscat -c ws://localhost:8080/ws?id=1
 {"vote":"5"}
 ```
 
+## プランニング対象変更
+```
+{"title":"project abc"}
+```
+
+## 投票リセット
+```
+{"reset":true}
+```
+
 疎通できればＯＫ
