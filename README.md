@@ -21,6 +21,4 @@ npx wscat -c ws://localhost:8080/ws?room=1
 {"type":"vote","value":"5"}
 ```
 
-
-
 疎通できればＯＫ
