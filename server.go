@@ -100,7 +100,7 @@ func (h *Hub) broadcastRoomState(room *Room) {
 	defer room.mu.Unlock()
 
 	state := map[string]interface{}{
-		"members": room.members,
+		"members": []string{},
 		"votes":   room.votes,
 	}
 
@@ -137,7 +137,7 @@ func (c *Member) readPump(h *Hub) {
 			h.mu.Lock()
 			room := h.rooms[c.roomID]
 			room.mu.Lock()
-			room.votes[c.name] = data["value"]
+			room.votes[c.id.String()] = data["value"]
 			room.mu.Unlock()
 			h.mu.Unlock()
 			h.broadcastRoomState(room)
