@@ -113,6 +113,7 @@ func (h *Hub) broadcastRoomState(room *Room) {
 	votes := room.votes
 
 	state := map[string]interface{}{
+		"reveal":  room.reveal,
 		"title":   room.title,
 		"members": members,
 		"votes":   votes,
