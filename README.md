@@ -13,12 +13,17 @@ go run main.go
 
 ## 接続の確立 (複数のターミナルから)
 ```
-npx wscat -c ws://localhost:8080/ws?room=1
+npx wscat -c ws://localhost:8080/ws?id=1
+```
+
+## 名前入力
+```
+{"name":"alice"}
 ```
 
 ## 投票
 ```
-{"type":"vote","value":"5"}
+{"vote":"5"}
 ```
 
 疎通できればＯＫ

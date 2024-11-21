@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -17,7 +16,7 @@ var upgrader = websocket.Upgrader{
 
 type Member struct {
 	conn   *websocket.Conn
-	id     uuid.UUID
+	uuid   string
 	name   string
 	roomID string
 	send   chan []byte
@@ -25,9 +24,9 @@ type Member struct {
 
 type Room struct {
 	ID      string
-	members map[*Member]bool
+	members map[string]*Member // UUIDをキーにしてメンバーを管理
 	mu      sync.Mutex
-	votes   map[string]string
+	votes   map[string]string // UUIDをキーにして投票を管理
 }
 
 type Hub struct {
@@ -60,17 +59,20 @@ func (h *Hub) addmemberToRoom(member *Member) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	// ルームの存在チェック
 	room, exists := h.rooms[member.roomID]
 	if !exists {
+		// ルームがない場合、新規作成
 		room = &Room{
 			ID:      member.roomID,
-			members: make(map[*Member]bool),
+			members: make(map[string]*Member),
 			votes:   make(map[string]string),
 		}
 		h.rooms[member.roomID] = room
 	}
+
 	room.mu.Lock()
-	room.members[member] = true
+	room.members[member.uuid] = member
 	room.mu.Unlock()
 
 	h.broadcastRoomState(room)
@@ -85,7 +87,7 @@ func (h *Hub) removememberFromRoom(member *Member) {
 		return
 	}
 	room.mu.Lock()
-	delete(room.members, member)
+	delete(room.members, member.uuid)
 	room.mu.Unlock()
 
 	if len(room.members) == 0 {
@@ -99,49 +101,61 @@ func (h *Hub) broadcastRoomState(room *Room) {
 	room.mu.Lock()
 	defer room.mu.Unlock()
 
-	state := map[string]interface{}{
-		"members": []string{},
-		"votes":   room.votes,
+	members := make([]map[string]string, 0)
+	for _, member := range room.members {
+		members = append(members, map[string]string{
+			"uuid": member.uuid,
+			"name": member.name,
+		})
 	}
 
-	for member := range room.members {
-		state["members"] = append(state["members"].([]string), member.id.String())
+	votes := room.votes
+
+	state := map[string]interface{}{
+		"members": members,
+		"votes":   votes,
 	}
 
 	message, _ := json.Marshal(state)
-	for member := range room.members {
+
+	for _, member := range room.members {
 		member.send <- message
 	}
 }
 
-func (c *Member) readPump(h *Hub) {
+func (c *Member) readPump(hub *Hub) {
 	defer func() {
-		h.unregister <- c
+		hub.unregister <- c
 		c.conn.Close()
 	}()
+
 	for {
-		_, message, err := c.conn.ReadMessage()
+		_, msg, err := c.conn.ReadMessage()
 		if err != nil {
-			log.Println("read error:", err)
+			log.Printf("Error reading message: %v\n", err)
 			break
 		}
 
-		var data map[string]string
-		if err := json.Unmarshal(message, &data); err != nil {
-			log.Println("invalid message format")
+		var message struct {
+			Name string `json:"name"`
+			Vote string `json:"vote"`
+		}
+		if err := json.Unmarshal(msg, &message); err != nil {
+			log.Printf("Invalid message format: %v\n", err)
 			continue
 		}
 
-		switch data["type"] {
-		case "vote":
-			h.mu.Lock()
-			room := h.rooms[c.roomID]
-			room.mu.Lock()
-			room.votes[c.id.String()] = data["value"]
-			room.mu.Unlock()
-			h.mu.Unlock()
-			h.broadcastRoomState(room)
+		if message.Name != "" {
+			c.name = message.Name
+			log.Printf("Client %s registered with name: %s\n", c.uuid, c.name)
 		}
+
+		if message.Vote != "" {
+			log.Printf("Client %s (%s) voted: %s\n", c.uuid, c.name, message.Vote)
+			hub.rooms[c.roomID].votes[c.uuid] = message.Vote
+		}
+
+		hub.broadcastRoomState(hub.rooms[c.roomID])
 	}
 }
 
@@ -164,17 +178,18 @@ func serveWs(h *Hub, w http.ResponseWriter, r *http.Request) {
 
 	roomID := r.URL.Query().Get("id")
 	if roomID == "" {
-		http.Error(w, "missing room", http.StatusBadRequest)
+		http.Error(w, "missing room id", http.StatusBadRequest)
 		return
 	}
-	uuidV1, err := uuid.NewRandom()
-	if err != nil {
-		panic(err)
+
+	clientUUID := uuid.New().String()
+	member := &Member{
+		uuid:   clientUUID,
+		conn:   conn,
+		roomID: roomID,
+		send:   make(chan []byte, 256),
 	}
 
-	fmt.Printf("Generated UUID v4: %s\n", uuidV1)
-
-	member := &Member{conn: conn, id: uuidV1, name: "", roomID: roomID, send: make(chan []byte, 256)}
 	h.register <- member
 
 	go member.readPump(h)
