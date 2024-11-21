@@ -151,6 +151,14 @@ func (c *Member) readPump(hub *Hub) {
 			hub.rooms[c.roomID].votes[c.uuid] = message.Vote
 		}
 
+		if message.Reset {
+			hub.rooms[c.roomID].mu.Lock()
+			for memberUuid := range hub.rooms[c.roomID].votes {
+				delete(hub.rooms[c.roomID].votes, memberUuid)
+			}
+			hub.rooms[c.roomID].mu.Unlock()
+		}
+
 		hub.broadcastRoomState(hub.rooms[c.roomID])
 	}
 }
