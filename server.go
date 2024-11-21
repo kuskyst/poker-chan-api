@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -15,6 +17,7 @@ var upgrader = websocket.Upgrader{
 
 type Member struct {
 	conn   *websocket.Conn
+	id     uuid.UUID
 	name   string
 	roomID string
 	send   chan []byte
@@ -97,12 +100,12 @@ func (h *Hub) broadcastRoomState(room *Room) {
 	defer room.mu.Unlock()
 
 	state := map[string]interface{}{
-		"members": []string{},
+		"members": room.members,
 		"votes":   room.votes,
 	}
 
 	for member := range room.members {
-		state["members"] = append(state["members"].([]string), member.name)
+		state["members"] = append(state["members"].([]string), member.id.String())
 	}
 
 	message, _ := json.Marshal(state)
@@ -159,14 +162,19 @@ func serveWs(h *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	roomID := r.URL.Query().Get("room")
-	name := r.URL.Query().Get("name")
-	if roomID == "" || name == "" {
-		http.Error(w, "missing room or name", http.StatusBadRequest)
+	roomID := r.URL.Query().Get("id")
+	if roomID == "" {
+		http.Error(w, "missing room", http.StatusBadRequest)
 		return
 	}
+	uuidV1, err := uuid.NewRandom()
+	if err != nil {
+		panic(err)
+	}
 
-	member := &Member{conn: conn, name: name, roomID: roomID, send: make(chan []byte, 256)}
+	fmt.Printf("Generated UUID v4: %s\n", uuidV1)
+
+	member := &Member{conn: conn, id: uuidV1, name: "", roomID: roomID, send: make(chan []byte, 256)}
 	h.register <- member
 
 	go member.readPump(h)
