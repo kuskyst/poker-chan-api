@@ -26,6 +26,7 @@ type Member struct {
 type Room struct {
 	ID      string
 	title   string
+	reveal  bool
 	members map[string]*Member
 	mu      sync.Mutex
 	votes   map[string]string
@@ -154,8 +155,8 @@ func (c *Member) readPump(hub *Hub) {
 		}
 
 		if message.Vote != "" {
-			log.Printf("Client %s (%s) voted: %s\n", c.uuid, c.name, message.Vote)
 			hub.rooms[c.roomID].votes[c.uuid] = message.Vote
+			log.Printf("Client %s (%s) voted: %s\n", c.uuid, c.name, message.Vote)
 		}
 
 		if message.Reset {
@@ -163,7 +164,12 @@ func (c *Member) readPump(hub *Hub) {
 			for memberUuid := range hub.rooms[c.roomID].votes {
 				delete(hub.rooms[c.roomID].votes, memberUuid)
 			}
+			hub.rooms[c.roomID].reveal = false
 			hub.rooms[c.roomID].mu.Unlock()
+		}
+
+		if message.Reveal {
+			hub.rooms[c.roomID].reveal = message.Reveal
 		}
 
 		hub.broadcastRoomState(hub.rooms[c.roomID])
