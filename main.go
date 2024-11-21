@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"poker-chan-api/model"
 	"sync"
 
 	"github.com/google/uuid"
@@ -134,10 +135,7 @@ func (c *Member) readPump(hub *Hub) {
 			break
 		}
 
-		var message struct {
-			Name string `json:"name"`
-			Vote string `json:"vote"`
-		}
+		var message model.Message
 		if err := json.Unmarshal(msg, &message); err != nil {
 			log.Printf("Invalid message format: %v\n", err)
 			continue
