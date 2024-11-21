@@ -59,10 +59,8 @@ func (h *Hub) addmemberToRoom(member *Member) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// ルームの存在チェック
 	room, exists := h.rooms[member.roomID]
 	if !exists {
-		// ルームがない場合、新規作成
 		room = &Room{
 			ID:      member.roomID,
 			members: make(map[string]*Member),
