@@ -36,4 +36,9 @@ npx wscat -c ws://localhost:8080/ws?id=1
 {"reset":true}
 ```
 
+## 開示
+```
+{"reveal":true}
+```
+
 疎通できればＯＫ
