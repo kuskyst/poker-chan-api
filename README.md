@@ -1,3 +1,11 @@
+# poker-chan-api 
+プランニングポーカーちゃんのバックエンド処理
+| # | |
+| ---- | ---- |
+| Language | Go 1.23 |
+| Router | gorilla/websocket |
+| etc | google/uuid |
+
 # 使用例
 wscatを使用する場合
 
