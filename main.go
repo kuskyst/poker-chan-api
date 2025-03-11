@@ -89,6 +89,7 @@ func (h *Hub) removememberFromRoom(member *Member) {
 	}
 	room.mu.Lock()
 	delete(room.members, member.uuid)
+	delete(room.votes, member.uuid)
 	room.mu.Unlock()
 
 	if len(room.members) == 0 {
