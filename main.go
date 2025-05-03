@@ -51,14 +51,14 @@ func (h *Hub) run() {
 	for {
 		select {
 		case member := <-h.register:
-			h.addmemberToRoom(member)
+			h.addMemberToRoom(member)
 		case member := <-h.unregister:
-			h.removememberFromRoom(member)
+			h.removeMemberFromRoom(member)
 		}
 	}
 }
 
-func (h *Hub) addmemberToRoom(member *Member) {
+func (h *Hub) addMemberToRoom(member *Member) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -79,7 +79,7 @@ func (h *Hub) addmemberToRoom(member *Member) {
 	h.broadcastRoomState(room)
 }
 
-func (h *Hub) removememberFromRoom(member *Member) {
+func (h *Hub) removeMemberFromRoom(member *Member) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
