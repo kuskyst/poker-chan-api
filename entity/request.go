@@ -1,6 +1,6 @@
-package model
+package entity
 
-type Message struct {
+type Request struct {
 	Title  string `json:"title,omitempty"`
 	Name   string `json:"name,omitempty"`
 	Vote   string `json:"vote,omitempty"`
